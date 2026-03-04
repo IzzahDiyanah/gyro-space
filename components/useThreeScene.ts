@@ -98,6 +98,12 @@ export function useThreeScene(
 
     // Scene & camera — camera stays at origin; we rotate the world around it
     const scene = new THREE.Scene()
+    const loader = new THREE.TextureLoader()
+    loader.load('/equirect-illusion.jpg', (texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      texture.colorSpace = THREE.SRGBColorSpace
+      scene.background = texture
+    })
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
     camera.position.set(0, 0, 0.01)
 
