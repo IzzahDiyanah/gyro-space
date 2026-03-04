@@ -122,7 +122,14 @@ export function useThreeScene(
 
     // ── Renderer ──
     const scene = new THREE.Scene()
-    scene.fog = new THREE.Fog(0x000008, 50, 180)
+
+    const loader = new THREE.TextureLoader()
+    loader.load('/equirect-2.webp', (texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      texture.colorSpace = THREE.SRGBColorSpace
+      scene.background = texture
+    })
+    // scene.fog = new THREE.Fog(0x000008, 50, 180)
 
     const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 800)
     camera.position.set(0, 6, 24)
@@ -135,8 +142,6 @@ export function useThreeScene(
 
     // ── Scene objects ──
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
-    const stars = buildStars(isMobile ? 8000 : 13000)
-    scene.add(stars, buildNebula())
 
     const nucleus = new THREE.Mesh(
       new THREE.SphereGeometry(1.1, 24, 24),
@@ -249,11 +254,10 @@ export function useThreeScene(
 
       orbits.forEach(({ pivot, spd, phase }) => { pivot.rotation.y = t * spd + phase })
       nucleus.scale.setScalar(1 + Math.sin(t * 1.8) * 0.055)
-      stars.rotation.y = t * 0.003
 
       // Apply gyro
       const g = gyroRef.current
-      if (g.enabled) {
+      if (g && g.enabled) {
         smoothAlpha += (g.alpha - smoothAlpha) * GYRO_SMOOTH * 60 * dt
         smoothBeta  += (g.beta  - smoothBeta)  * GYRO_SMOOTH * 60 * dt
 
