@@ -102,13 +102,13 @@ function makeGyroAssembly(color: number) {
   return gyro
 }
 
-const ORBIT_DATA = [
-  { r: 5.5,  spd: 0.32, phase: 0,              tilt: 0.3,   color: 0x44aaff, y: 0   },
-  { r: 8.5,  spd: 0.19, phase: Math.PI * 0.65, tilt: -0.5,  color: 0x66ddff, y: 1.4 },
-  { r: 11.5, spd: 0.12, phase: Math.PI * 1.3,  tilt: 0.55,  color: 0x88ffee, y: -1  },
-  { r: 7.0,  spd: 0.25, phase: Math.PI * 0.4,  tilt: -0.2,  color: 0x99bbff, y: -2  },
-  { r: 9.5,  spd: 0.16, phase: Math.PI,        tilt: 0.4,   color: 0x55ccff, y: 2   },
-]
+// const ORBIT_DATA = [
+//   { r: 5.5,  spd: 0.32, phase: 0,              tilt: 0.3,   color: 0x44aaff, y: 0   },
+//   { r: 8.5,  spd: 0.19, phase: Math.PI * 0.65, tilt: -0.5,  color: 0x66ddff, y: 1.4 },
+//   { r: 11.5, spd: 0.12, phase: Math.PI * 1.3,  tilt: 0.55,  color: 0x88ffee, y: -1  },
+//   { r: 7.0,  spd: 0.25, phase: Math.PI * 0.4,  tilt: -0.2,  color: 0x99bbff, y: -2  },
+//   { r: 9.5,  spd: 0.16, phase: Math.PI,        tilt: 0.4,   color: 0x55ccff, y: 2   },
+// ]
 
 // ─── Main hook ────────────────────────────────────────────────────────────────
 export function useThreeScene(
@@ -124,7 +124,7 @@ export function useThreeScene(
     const scene = new THREE.Scene()
 
     const loader = new THREE.TextureLoader()
-     loader.load('/equirect-illusion.jpg', (texture) => {
+    loader.load('/equirect-illusion.jpg', (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping
       texture.colorSpace = THREE.SRGBColorSpace
       scene.background = texture
@@ -154,31 +154,31 @@ export function useThreeScene(
     ))
 
     // ── Orbits ──
-    const orbits = ORBIT_DATA.map(({ r, spd, phase, tilt, color, y }) => {
-      const pivot = new THREE.Object3D()
-      pivot.rotation.z = tilt
-      scene.add(pivot)
+    // const orbits = ORBIT_DATA.map(({ r, spd, phase, tilt, color, y }) => {
+    //   const pivot = new THREE.Object3D()
+    //   pivot.rotation.z = tilt
+    //   scene.add(pivot)
 
-      const arm = new THREE.Object3D()
-      arm.position.set(r, y, 0)
-      pivot.add(arm)
+    //   const arm = new THREE.Object3D()
+    //   arm.position.set(r, y, 0)
+    //   pivot.add(arm)
 
-      const pts: number[] = []
-      for (let i = 0; i <= 128; i++) {
-        const a = (i / 128) * Math.PI * 2
-        pts.push(Math.cos(a) * r, 0, Math.sin(a) * r)
-      }
-      const pathGeo = new THREE.BufferGeometry()
-      pathGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-      const path = new THREE.LineLoop(pathGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.12 }))
-      path.rotation.z = tilt
-      scene.add(path)
+    //   const pts: number[] = []
+    //   for (let i = 0; i <= 128; i++) {
+    //     const a = (i / 128) * Math.PI * 2
+    //     pts.push(Math.cos(a) * r, 0, Math.sin(a) * r)
+    //   }
+    //   const pathGeo = new THREE.BufferGeometry()
+    //   pathGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+    //   const path = new THREE.LineLoop(pathGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.12 }))
+    //   path.rotation.z = tilt
+    //   scene.add(path)
 
-      arm.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), new THREE.MeshBasicMaterial({ color })))
-      arm.add(makeGyroAssembly(color))
+    //   arm.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), new THREE.MeshBasicMaterial({ color })))
+    //   arm.add(makeGyroAssembly(color))
 
-      return { pivot, spd, phase }
-    })
+    //   return { pivot, spd, phase }
+    // })
 
     // ── Camera state ──
     let camTheta = 0.3, camPhi = 0.42, camDist = 22
@@ -252,8 +252,8 @@ export function useThreeScene(
       const dt = clock.getDelta()
       const t  = clock.elapsedTime
 
-      orbits.forEach(({ pivot, spd, phase }) => { pivot.rotation.y = t * spd + phase })
-      nucleus.scale.setScalar(1 + Math.sin(t * 1.8) * 0.055)
+      // orbits.forEach(({ pivot, spd, phase }) => { pivot.rotation.y = t * spd + phase })
+      // nucleus.scale.setScalar(1 + Math.sin(t * 1.8) * 0.055)
 
       // Apply gyro
       const g = gyroRef.current
