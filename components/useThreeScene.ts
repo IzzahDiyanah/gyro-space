@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { GyroValues } from './useGyroscope'
 
-// ─── Gyroscope Object3D (from three/addons/misc/Gyroscope.js) ────────────────
+// ─── Gyroscope Object3D ───────────────────────────────────────────────────────
 const _tObj = new THREE.Vector3()
 const _qObj = new THREE.Quaternion()
 const _sObj = new THREE.Vector3()
@@ -20,7 +20,6 @@ class Gyroscope extends THREE.Object3D {
         this.matrixWorld.multiplyMatrices(this.parent.matrixWorld, this.matrix)
         this.matrixWorld.decompose(_tWld, _qWld, _sWld)
         this.matrix.decompose(_tObj, _qObj, _sObj)
-        // Key: world position + local rotation + world scale
         this.matrixWorld.compose(_tWld, _qObj, _sWld)
       } else {
         this.matrixWorld.copy(this.matrix)
@@ -32,58 +31,33 @@ class Gyroscope extends THREE.Object3D {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function buildStars(count: number) {
-  const pos: number[] = [], col: number[] = []
-  for (let i = 0; i < count; i++) {
-    const theta = Math.random() * Math.PI * 2
-    let x: number, y: number, z: number
-    if (Math.random() < 0.65) {
-      const dist = 30 + Math.random() * 200
-      x = Math.cos(theta) * dist
-      z = Math.sin(theta) * dist
-      y = (Math.random() - 0.5) * dist * 0.15
-    } else {
-      const dist = 50 + Math.random() * 180
-      const phi = (Math.random() - 0.5) * Math.PI
-      x = Math.sin(phi) * Math.cos(theta) * dist
-      y = Math.cos(phi) * dist * 0.5
-      z = Math.sin(phi) * Math.sin(theta) * dist
-    }
-    pos.push(x, y, z)
-    if (Math.random() < 0.12) { col.push(1.0, 0.88, 0.65) }
-    else { const b = 0.7 + Math.random() * 0.3; col.push(0.85, 0.9, b) }
+// ─── 360° Sky Sphere ─────────────────────────────────────────────────────────
+// PANORAMA_URL: any equirectangular (2:1 ratio) JPG/PNG.
+// - To use your own image: drop it in /public and set '/your-image.jpg'
+// - Free Milky Way 360s: https://www.flickr.com/search/?text=milky+way+equirectangular
+// - More free HDRIs: https://polyhaven.com/hdris (download as JPG panorama)
+const PANORAMA_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Milky_Way_Arch.jpg/2560px-Milky_Way_Arch.jpg'
+
+function buildSkySphere(): THREE.Mesh {
+  const geo = new THREE.SphereGeometry(500, 60, 40)
+  geo.scale(-1, 1, 1) // flip normals inward so texture is visible from inside
+
+  const texture = new THREE.TextureLoader().load(PANORAMA_URL)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  // colorSpace available in Three >=0.152; safe to omit on older builds
+  if ('colorSpace' in texture) {
+    (texture as THREE.Texture & { colorSpace: string }).colorSpace = THREE.SRGBColorSpace
   }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
-  return new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 1.0, vertexColors: true, transparent: true, opacity: 0.85,
-    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
-  }))
+
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture }))
 }
 
-function buildNebula() {
-  const pos: number[] = [], col: number[] = []
-  for (let i = 0; i < 1800; i++) {
-    const theta = Math.random() * Math.PI * 2
-    const dist = 25 + Math.random() * 160
-    pos.push(Math.cos(theta) * dist, (Math.random() - 0.5) * dist * 0.13, Math.sin(theta) * dist)
-    const t = Math.random()
-    col.push(0.15 + t * 0.25, 0.2 + t * 0.3, 0.55 + t * 0.45)
-  }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
-  return new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 3.5, vertexColors: true, transparent: true, opacity: 0.065,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }))
-}
-
-function makeGyroAssembly(color: number) {
+// ─── Gyroscope ring assembly ──────────────────────────────────────────────────
+function makeGyroAssembly(color: number): Gyroscope {
   const gyro = new Gyroscope()
-  const mat = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
+  const mat = (c: number) =>
+    new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
 
   const r1 = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.022, 8, 72), mat(color))
   const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.018, 8, 56), mat(color))
@@ -92,23 +66,25 @@ function makeGyroAssembly(color: number) {
   r3.rotation.y = Math.PI / 2
 
   const spokeGeo = new THREE.BufferGeometry()
-  spokeGeo.setAttribute('position', new THREE.Float32BufferAttribute([
-    -1.35, 0, 0, 1.35, 0, 0, 0, -1.35, 0, 0, 1.35, 0,
-  ], 3))
-  const spokes = new THREE.LineSegments(spokeGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22 }))
-  const center = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }))
-
-  gyro.add(r1, r2, r3, spokes, center)
+  spokeGeo.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([-1.35, 0, 0, 1.35, 0, 0, 0, -1.35, 0, 0, 1.35, 0], 3)
+  )
+  gyro.add(
+    r1, r2, r3,
+    new THREE.LineSegments(spokeGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22 })),
+    new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }))
+  )
   return gyro
 }
 
-// const ORBIT_DATA = [
-//   { r: 5.5,  spd: 0.32, phase: 0,              tilt: 0.3,   color: 0x44aaff, y: 0   },
-//   { r: 8.5,  spd: 0.19, phase: Math.PI * 0.65, tilt: -0.5,  color: 0x66ddff, y: 1.4 },
-//   { r: 11.5, spd: 0.12, phase: Math.PI * 1.3,  tilt: 0.55,  color: 0x88ffee, y: -1  },
-//   { r: 7.0,  spd: 0.25, phase: Math.PI * 0.4,  tilt: -0.2,  color: 0x99bbff, y: -2  },
-//   { r: 9.5,  spd: 0.16, phase: Math.PI,        tilt: 0.4,   color: 0x55ccff, y: 2   },
-// ]
+const ORBIT_DATA = [
+  { r: 5.5,  spd: 0.32, phase: 0,              tilt: 0.3,  color: 0x44aaff, y: 0   },
+  { r: 8.5,  spd: 0.19, phase: Math.PI * 0.65, tilt: -0.5, color: 0x66ddff, y: 1.4 },
+  { r: 11.5, spd: 0.12, phase: Math.PI * 1.3,  tilt: 0.55, color: 0x88ffee, y: -1  },
+  { r: 7.0,  spd: 0.25, phase: Math.PI * 0.4,  tilt: -0.2, color: 0x99bbff, y: -2  },
+  { r: 9.5,  spd: 0.16, phase: Math.PI,        tilt: 0.4,  color: 0x55ccff, y: 2   },
+]
 
 // ─── Main hook ────────────────────────────────────────────────────────────────
 export function useThreeScene(
@@ -120,84 +96,83 @@ export function useThreeScene(
   useEffect(() => {
     if (!containerRef.current) return
 
-    // ── Renderer ──
+    // Scene & camera — camera stays at origin; we rotate the world around it
     const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+    camera.position.set(0, 0, 0.01)
 
-    const loader = new THREE.TextureLoader()
-    loader.load('/equirect-illusion.jpg', (texture) => {
-      texture.mapping = THREE.EquirectangularReflectionMapping
-      texture.colorSpace = THREE.SRGBColorSpace
-      scene.background = texture
-    })
-    // scene.fog = new THREE.Fog(0x000008, 50, 180)
-
-    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 800)
-    camera.position.set(0, 6, 24)
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setClearColor(0x000005, 1)
     containerRef.current.appendChild(renderer.domElement)
 
-    // ── Scene objects ──
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+    // ── Sky sphere (360° panorama) ──
+    const skySphere = buildSkySphere()
+    scene.add(skySphere)
+
+    // ── Galaxy nucleus (floats in the scene) ──
+    const nucleusGroup = new THREE.Group()
+    nucleusGroup.position.set(0, 0, -20)
+    scene.add(nucleusGroup)
 
     const nucleus = new THREE.Mesh(
       new THREE.SphereGeometry(1.1, 24, 24),
       new THREE.MeshBasicMaterial({ color: 0xfff0cc })
     )
-    scene.add(nucleus)
-    scene.add(new THREE.Mesh(
+    nucleusGroup.add(nucleus)
+    nucleusGroup.add(new THREE.Mesh(
       new THREE.SphereGeometry(2.0, 24, 24),
       new THREE.MeshBasicMaterial({ color: 0xff8833, transparent: true, opacity: 0.1, side: THREE.DoubleSide })
     ))
 
-    // ── Orbits ──
-    // const orbits = ORBIT_DATA.map(({ r, spd, phase, tilt, color, y }) => {
-    //   const pivot = new THREE.Object3D()
-    //   pivot.rotation.z = tilt
-    //   scene.add(pivot)
+    // ── Orbiting bodies ──
+    const orbits = ORBIT_DATA.map(({ r, spd, phase, tilt, color, y }) => {
+      const pivot = new THREE.Object3D()
+      pivot.rotation.z = tilt
+      nucleusGroup.add(pivot)
 
-    //   const arm = new THREE.Object3D()
-    //   arm.position.set(r, y, 0)
-    //   pivot.add(arm)
+      const arm = new THREE.Object3D()
+      arm.position.set(r, y, 0)
+      pivot.add(arm)
 
-    //   const pts: number[] = []
-    //   for (let i = 0; i <= 128; i++) {
-    //     const a = (i / 128) * Math.PI * 2
-    //     pts.push(Math.cos(a) * r, 0, Math.sin(a) * r)
-    //   }
-    //   const pathGeo = new THREE.BufferGeometry()
-    //   pathGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-    //   const path = new THREE.LineLoop(pathGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.12 }))
-    //   path.rotation.z = tilt
-    //   scene.add(path)
+      // Orbit path ring
+      const pts: number[] = []
+      for (let i = 0; i <= 128; i++) {
+        const a = (i / 128) * Math.PI * 2
+        pts.push(Math.cos(a) * r, 0, Math.sin(a) * r)
+      }
+      const pathGeo = new THREE.BufferGeometry()
+      pathGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+      const path = new THREE.LineLoop(pathGeo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.15 }))
+      path.rotation.z = tilt
+      nucleusGroup.add(path)
 
-    //   arm.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), new THREE.MeshBasicMaterial({ color })))
-    //   arm.add(makeGyroAssembly(color))
+      arm.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), new THREE.MeshBasicMaterial({ color })))
+      arm.add(makeGyroAssembly(color))
 
-    //   return { pivot, spd, phase }
-    // })
+      return { pivot, spd, phase }
+    })
 
-    // ── Camera state ──
-    let camTheta = 0.3, camPhi = 0.42, camDist = 22
-    let targetTheta = camTheta, targetPhi = camPhi, targetDist = camDist
+    // ── Rotation state (degrees) ──
+    // We rotate the whole world instead of moving the camera — standard 360-viewer pattern
+    let rotY = 0, rotX = 0
+    let targetRotY = 0, targetRotX = 0
 
-    // ── Touch controls ──
-    let touchStart: { x: number; y: number; theta: number; phi: number } | null = null
-    let pinchStartDist = 0, pinchStartCamDist = 0
+    // ── Touch / pinch controls ──
+    let touchStart: { x: number; y: number; rotY: number; rotX: number } | null = null
+    let pinchStartDist = 0, pinchStartFov = camera.fov
 
     const onTouchStart = (e: TouchEvent) => {
       e.preventDefault()
       if (e.touches.length === 1) {
-        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, theta: camTheta, phi: camPhi }
+        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, rotY, rotX }
       } else if (e.touches.length === 2) {
         pinchStartDist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         )
-        pinchStartCamDist = camDist
+        pinchStartFov = camera.fov
         touchStart = null
       }
     }
@@ -207,14 +182,15 @@ export function useThreeScene(
       if (e.touches.length === 1 && touchStart) {
         const dx = e.touches[0].clientX - touchStart.x
         const dy = e.touches[0].clientY - touchStart.y
-        targetTheta = touchStart.theta - dx * 0.007
-        targetPhi   = Math.max(0.08, Math.min(Math.PI * 0.46, touchStart.phi - dy * 0.007))
+        targetRotY = touchStart.rotY + dx * 0.25
+        targetRotX = Math.max(-85, Math.min(85, touchStart.rotX - dy * 0.25))
       } else if (e.touches.length === 2 && pinchStartDist > 0) {
         const d = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         )
-        targetDist = Math.max(8, Math.min(50, pinchStartCamDist * (pinchStartDist / d)))
+        camera.fov = Math.max(30, Math.min(100, pinchStartFov * (pinchStartDist / d)))
+        camera.updateProjectionMatrix()
       }
     }
 
@@ -228,7 +204,7 @@ export function useThreeScene(
     renderer.domElement.addEventListener('touchmove',  onTouchMove,  { passive: false })
     renderer.domElement.addEventListener('touchend',   onTouchEnd,   { passive: false })
 
-    // ── Gyro smoothing state ──
+    // ── Gyro smoothing ──
     let smoothAlpha = 0, smoothBeta = 0
     let baseAlpha: number | null = null, baseBeta: number | null = null
     const GYRO_SMOOTH = 0.06
@@ -243,51 +219,49 @@ export function useThreeScene(
 
     // ── Animation loop ──
     const clock = new THREE.Clock()
-    const camTarget = new THREE.Vector3()
     const LERP = 0.08
     let rafId: number
 
     function animate() {
       rafId = requestAnimationFrame(animate)
-      const dt = clock.getDelta()
+      const dt = Math.min(clock.getDelta(), 0.05)
       const t  = clock.elapsedTime
 
-      // orbits.forEach(({ pivot, spd, phase }) => { pivot.rotation.y = t * spd + phase })
-      // nucleus.scale.setScalar(1 + Math.sin(t * 1.8) * 0.055)
+      // Animate orbits
+      orbits.forEach(({ pivot, spd, phase }) => { pivot.rotation.y = t * spd + phase })
+      const pulse = 1 + Math.sin(t * 1.8) * 0.055
+      nucleus.scale.setScalar(pulse)
 
-      // Apply gyro
+      // Gyro → rotation target
       const g = gyroRef.current
       if (g && g.enabled) {
         smoothAlpha += (g.alpha - smoothAlpha) * GYRO_SMOOTH * 60 * dt
         smoothBeta  += (g.beta  - smoothBeta)  * GYRO_SMOOTH * 60 * dt
-
         if (baseAlpha === null) { baseAlpha = smoothAlpha; baseBeta = smoothBeta }
-
         let dA = smoothAlpha - baseAlpha
         if (dA > 180)  dA -= 360
         if (dA < -180) dA += 360
         const dB = smoothBeta - baseBeta!
-
-        targetTheta = 0.3 - dA * (Math.PI / 180) * 0.7
-        targetPhi   = Math.max(0.08, Math.min(Math.PI * 0.46, 0.42 + dB * (Math.PI / 180) * 0.5))
+        targetRotY = -dA * 0.7
+        targetRotX = Math.max(-85, Math.min(85, -dB * 0.5))
       }
 
+      // Smooth lerp
       const L = LERP * 60 * dt
-      camTheta += (targetTheta - camTheta) * L
-      camPhi   += (targetPhi   - camPhi)   * L
-      camDist  += (targetDist  - camDist)  * L
+      rotY += (targetRotY - rotY) * L
+      rotX += (targetRotX - rotX) * L
 
-      camera.position.x = camDist * Math.sin(camTheta) * Math.sin(camPhi)
-      camera.position.y = camDist * Math.cos(camPhi)
-      camera.position.z = camDist * Math.cos(camTheta) * Math.sin(camPhi)
-      camera.lookAt(camTarget)
+      // Rotate sky + nucleus group together so panorama and 3D objects stay in sync
+      const yRad = THREE.MathUtils.degToRad(rotY)
+      const xRad = THREE.MathUtils.degToRad(rotX)
+      skySphere.rotation.set(xRad, yRad, 0)
+      nucleusGroup.rotation.set(xRad, yRad, 0)
 
       renderer.render(scene, camera)
     }
     animate()
 
-    // ── Cleanup ──
-    cleanupRef.current = () => {
+    return () => {
       cancelAnimationFrame(rafId)
       window.removeEventListener('resize', onResize)
       renderer.domElement.removeEventListener('touchstart', onTouchStart)
@@ -298,7 +272,5 @@ export function useThreeScene(
         containerRef.current.removeChild(renderer.domElement)
       }
     }
-
-    return () => { cleanupRef.current?.() }
   }, [containerRef, gyroRef])
 }
