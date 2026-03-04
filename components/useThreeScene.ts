@@ -124,7 +124,7 @@ export function useThreeScene(
     const scene = new THREE.Scene()
 
     const loader = new THREE.TextureLoader()
-    loader.load('/equirect-2.webp', (texture) => {
+     loader.load('/equirect-illusion.jpg', (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping
       texture.colorSpace = THREE.SRGBColorSpace
       scene.background = texture
